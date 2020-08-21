@@ -1,0 +1,60 @@
+#!/bin/bash
+
+
+# Submits Incorrect Files. This should fail provide.          
+echo "~~~~~~~~~ Require Test ~~~~~~~~~~~~"
+
+HWNAME="$1"
+SCP_DIR="$2"
+EDIT_DIR="$3"
+ACCOUNT="$4"
+SUBMIT_DIR="ProvideCheck/$EDIT_DIR"
+shift 6 # shift to grab required files from command line
+REQUIRED_FILES=("$@")
+FAIL="NOT_OK"
+FAIL2="This submission doesn't count. Please try again later!"
+
+cd "$EDIT_DIR"
+num=1
+for file in "${REQUIRED_FILES[@]}"; do
+    mv "$file" "bad_file$num.bad"
+    let "num++"
+done
+cd - >/dev/null 
+
+
+# copy files to student level account
+scp -q -r "$EDIT_DIR" "$ACCOUNT":~/ProvideCheck/"$SCP_DIR"
+
+# ssh and provide 
+ssh -T "$ACCOUNT" bash -s << EOF 
+    cd "$SUBMIT_DIR"
+    yes | provide comp15 "$HWNAME" * > provide_stdout.txt
+    if egrep -q "($FAIL|$FAIL2)" provide_stdout.txt; then
+        echo "Failed to provide. Good!"
+        exit 0
+    else
+        exit 1
+    fi
+EOF
+
+
+
+
+
+
+# NOTE: for future reference.  When we want to move scp and provide back to
+# provide_checker
+
+# ssh -T "$ACCOUNT" bash -s << EOF > "$EDIT_DIR"/provide_stdout.txt
+#     cd "$SUBMIT_DIR"
+#     yes | provide comp15 "$HWNAME" * 
+# EOF
+
+# # The test
+# if egrep -q '(NOT_OK|Notify your instructor)' "$EDIT_DIR"/provide_stdout.txt; then
+#     exit 1
+# else
+#     exit 0
+# fi
+

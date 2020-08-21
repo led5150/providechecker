@@ -1,0 +1,37 @@
+#!/bin/bash
+
+echo "~~~~~~~~ Not Allowed Test ~~~~~~~~~~~~"
+
+HWNAME="$1"
+SCP_DIR="$2"
+EDIT_DIR="$3"
+ACCOUNT="$4"
+SUBMIT_DIR="ProvideCheck/$EDIT_DIR"
+shift 6 # shift to grab not allowed file names.
+NOT_ALLOWED=("$@")
+
+cd "$EDIT_DIR"
+
+for file in "${NOT_ALLOWED[@]}"; do
+    touch "$file"
+done
+
+cd - >/dev/null
+
+# copy files to student level account
+scp -q -r "$EDIT_DIR" "$ACCOUNT":~/ProvideCheck/"$SCP_DIR"
+
+# ssh and provide 
+ssh -T "$ACCOUNT" bash -s << EOF 
+    cd "$SUBMIT_DIR"
+    yes | provide comp15 "$HWNAME" * > provide_stdout.txt
+    if grep -q "NOT_OK" provide_stdout.txt; then
+        echo "Attempted to submit files that were not allowed."
+        echo "Failed to provide. Good!"
+        exit 0
+    else
+        echo "Submission was accepted. Bad!"
+        echo "Did you forget to add file names after 'not_allowed' in testset?"
+        exit 1
+    fi
+EOF
