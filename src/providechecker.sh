@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Usage: ./provide_checker.sh homework_name file1 file2 file3 ...
-rm -r test_pc_pc_submission
+
 # Validates user has properly run program
 function validate_usage() 
 {
     # Check to make sure user has run the program correctly
     if [[ "$#" -lt 2 ]]; then
         echo "Invalid number of arguments provided"
-        echo "Usage: ./provide_checker.sh homework_name file1 file2 file3 ..."
+        echo "Usage: $0 homework_name file1 file2 file3 ..."
         exit
     fi
 }
@@ -25,13 +25,13 @@ function remove_line_continuations()
 function set_variables() 
 {
     # Store homework name, user given files and set up file paths
-    export REMOTE="mkorma01@homework.cs.tufts.edu"
-    export HWNAME="$1"
+    REMOTE="mkorma01@homework.cs.tufts.edu"
+    HWNAME="$1"
     shift
     USR_FILES=("$@")
     TEST_SET_PATH=/comp/15/grading/screening/testsets/"$HWNAME"
     ASSN_CONF=/comp/15/grading/assignments.conf
-    PC_TEST_DIR=$(pwd)/pc_tests
+    PC_TEST_DIR=${BASH_SOURCE%/*}/checkers
     TEST_DIR="$HWNAME"_pc_submission
     mkdir "$TEST_DIR"
 
@@ -128,7 +128,7 @@ setup "$@"
 validate_assignment
 run_tests
 
-
+rm -rf $TEST_DIR
 
 
 
