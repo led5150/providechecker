@@ -8,7 +8,7 @@ echo "~~~~~~~~~   Passing Test ~~~~~~~~~~~~"
 HWNAME="$1"
 SUBMIT_DIR="ProvideCheck/$2"
 cd "$SUBMIT_DIR"
-FAIL="This submission doesn't count. Please try again later!"
+FAIL="This submission doesn't count"
 # Provide submission 
 yes | provide comp15 "$HWNAME" * > provide_stdout.txt
 
