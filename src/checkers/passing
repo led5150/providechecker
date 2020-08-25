@@ -1,24 +1,24 @@
 #!/bin/bash
 
-# Submits Correct Files. This should pass provide and create a valid   
-# submission.   An error message is displayed if it fails           
+# Submits Correct Files. This should pass provide and create a valid
+# submission.   An error message is displayed if it fails
 
-echo "~~~~~~~~~   Passing Test ~~~~~~~~~~~~"
+OUTFILE=provide_output.txt
 
-HWNAME="$1"
-SUBMIT_DIR="ProvideCheck/$2"
-cd "$SUBMIT_DIR"
-FAIL="This submission doesn't count. Please try again later!"
-# Provide submission 
-yes | provide comp15 "$HWNAME" * > provide_stdout.txt
+function performTests() {
+        FAIL="This submission doesn't count. Please try again later!"
 
-# The test
-if egrep -q "($FAIL|Notify your instructor)" provide_stdout.txt; then
-    echo "Submission failed to provide. Bad!"
-    exit 1
-else
-    echo "Submission was accepted. Good!"
-    exit 0
+        echo "~~~~~~~~~   Passing Test ~~~~~~~~~~~~"
+        # The test
+        if grep -qE "($FAIL|Notify your instructor)" "$OUTFILE"; then
+                echo "Submission failed to provide. Bad!"
+                exit 1
+        else
+                echo "Submission was accepted. Good!"
+                exit 0
+        fi
+}
+
+if [[ "$1" == "--test" ]]; then
+        performTests
 fi
-
-
