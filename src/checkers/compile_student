@@ -9,12 +9,13 @@ COMPILE_CMND=("${@:1}")
 OUTFILE=provide_output.txt
 
 function warnEdits() {
+
         WARN_CONDITION="static bool wrn5611d9f99bc990c23027ca70b7aba2(int wrne9cc6) {}"
 
         # Clears .cpp files and inserts warning producing code
         find . -type f -name \*.cpp \
-                -exec truncate -s 0 {} \;\
-                -exec sed -i "1i$WARN_CONDITION" {} \;
+                -exec sh -c 'echo "" >> "$1"' _ {} \; -print0 |
+                xargs -r0 sed -i -e "1i$WARN_CONDITION"
 }
 
 function warnTests() {
@@ -31,8 +32,8 @@ function errorEdits() {
         # Clears .cpp files and inserts error producing code
         find . -maxdepth 1 -type f \
                 -name \*.cpp \
-                -exec truncate -s 0 {} \;\
-                -exec sed -i '1i*((*void)nullptr)\' {} \;
+                -exec sh -c 'echo "" >> "$1"' _ {} \; \
+                -exec sed -i -e '1i*((*void)nullptr)\' {} \;
 }
 
 function errorTests() {
@@ -51,7 +52,7 @@ function stopEdits() {
         # Edits makefile if present to create a stopping condition
         find . -maxdepth 1 -type f \
                 -name Makefile \
-                -exec truncate -s 0 {} \;\
+                -exec sh -c 'echo "" >> "$1"' _ {} \; \
                 -exec sed -i -e "1i$STOP_CONDITION" {} \;
 }
 
