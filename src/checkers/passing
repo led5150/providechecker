@@ -6,7 +6,7 @@
 OUTFILE=provide_output.txt
 
 function performTests() {
-        FAIL="This submission doesn't count. Please try again later!"
+        FAIL="This submission doesn't count"
 
         echo "~~~~~~~~~   Passing Test ~~~~~~~~~~~~"
         # The test
