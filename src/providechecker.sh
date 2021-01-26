@@ -5,7 +5,7 @@ function validate_usage() {
         # Check to make sure user has run the program correctly
         if [[ "$#" -lt 2 ]]; then
                 echo "Invalid number of arguments provided"
-                echo "Usage: $0 homework_name file1 file2 file3 ..."
+                echo "Usage: $0 homework_name [-a | --auto] [-f | --files file1 file2 file3 ...]"
                 exit
         fi
 }
@@ -23,13 +23,35 @@ function set_variables() {
         REMOTE="mkorma01@homework.cs.tufts.edu"
         HWNAME="$1"
         shift
-        USR_FILES=("$@")
+        
         TEST_SET_PATH=/comp/15/grading/screening/testsets/"$HWNAME"
         ASSN_CONF=/comp/15/grading/assignments.conf
         CHECKERS=${BASH_SOURCE%/*}/checkers
-        BASE_DIR="providecheck/$HWNAME"
+        BASE_DIR="providechecker_results/$HWNAME"
         mkdir -p "$BASE_DIR"
 
+        # Here we will evaluate if running in auto or user provided mode:
+        # if auto, we create the files from the files listed after the 'require'
+        # option in the testset, otherwise, we get the files listed on the 
+        # command line from the user.
+        if [[ "$1" == "-a" || "$1" == "--auto" ]]; then
+                echo "    *** running in auto mode ***"
+                echo "creating required files from testset..."
+
+                REQ_FILES=$(remove_line_continuations "$TEST_SET_PATH" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")
+                IFS=' ' read -r -a USR_FILES <<< "$REQ_FILES"
+
+                for file in "${USR_FILES[@]}"; do
+                        echo "$file"
+                done
+        elif [[ "$1" == "-f" || "$1" == "--files" ]]; then
+                shift
+                USR_FILES=("$@")
+        else 
+                echo "Invalid option"
+                exit
+        fi
+        exit
         # Remove line continuations and store testset
         TEST_SET=$(remove_line_continuations "$TEST_SET_PATH")
 }
@@ -102,7 +124,7 @@ function perform_edits() {
 function remote_provide() {
         # copy files to student level account
         # might use rsync instead
-        ssh "$REMOTE" "rm -rf ~/$BASE_DIR && mkdir -p ~/$BASE_DIR "
+        ssh "$REMOTE" "rm -rf ~/$BASE_DIR && mkdir -p ~/$BASE_DIR"
         scp -q -r "$BASE_DIR" "$REMOTE:~/$BASE_DIR/.."
 
         # For each directory
