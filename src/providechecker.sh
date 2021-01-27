@@ -1,11 +1,13 @@
 #!/bin/bash
 
+rm -r providechecker_results
+
 # Validates user has properly run program
 function validate_usage() {
         # Check to make sure user has run the program correctly
         if [[ "$#" -lt 2 ]]; then
                 echo "Invalid number of arguments provided"
-                echo "Usage: $0 homework_name [-a | --auto] [-f | --files file1 file2 file3 ...]"
+                echo "Usage: $0 homework_name [(-a|--auto)] [(-f|--files) file1 file2 file3 ...]"
                 exit
         fi
 }
@@ -16,6 +18,53 @@ function remove_line_continuations() {
         echo "$parsed"
 }
 
+function auto_mode() {
+        # Run Auto Mode to create needed files
+        echo "    *** running in auto mode ***"
+        echo "creating required files from testset in:"
+        AUTO_DIR="$BASE_DIR/auto_created_files"
+        echo "$AUTO_DIR"
+
+        # make the directory for the automagially created files
+        mkdir -p "$AUTO_DIR"
+
+        # parse required files from testset
+        REQ_FILES=$(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")
+        IFS=' ' read -r -a USR_FILES <<< "$REQ_FILES"
+
+        # Get the executable name, if there is one specified
+        EXEC=$(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\scompile_student\s--assert-exec=).[^\s]+")
+        if [[ "$EXEC" == "" ]]; then
+                echo "Executable could not be parsed from $TEST_SET_PATH"
+                echo "Make sure an executable name has been specified"
+                echo "after --assert-exec="
+                exit 1
+        fi
+
+        # Create the specified files parsed from the testset.
+        # If the file has a ".cpp" extension, we overwrite it to make it
+        # a working file using the file_maker.sh utility.
+        for (( i=0; i<"${#USR_FILES[@]}"; i++ )); do
+                file="$AUTO_DIR/${USR_FILES[i]}"
+                touch "$file"
+                if [[ "${USR_FILES[i]}" =~ .*".cpp" ]]; then
+                        "$UTILS"/file_maker.sh cpp "${USR_FILES[i]}"
+                        mv "${USR_FILES[i]}" "$AUTO_DIR"
+                fi
+                USR_FILES[i]="$file" # update USR_FILE array 
+                                        # to hold full path to file
+        done
+
+        # If a Makefile was created in the above loop, we need to edit
+        # it to ensure it is a working Makefile. Again we use the 
+        # file_maker.sh utility
+        if [[ -f "$AUTO_DIR/Makefile" ]]; then
+                CPP=($(find $AUTO_DIR -type f -name \*.cpp))
+                "$UTILS"/file_maker.sh make "$EXEC" "${CPP[0]##*\/}"
+                mv "Makefile" "$AUTO_DIR"
+        fi
+}
+
 # Sets variables we need for various purposes. Takes all arguments from
 # command line
 function set_variables() {
@@ -23,10 +72,12 @@ function set_variables() {
         REMOTE="mkorma01@homework.cs.tufts.edu"
         HWNAME="$1"
         shift
-        
+
         TEST_SET_PATH=/comp/15/grading/screening/testsets/"$HWNAME"
+        TEST_SET=$(remove_line_continuations "$TEST_SET_PATH") # Remove line continuations and store testset
         ASSN_CONF=/comp/15/grading/assignments.conf
         CHECKERS=${BASH_SOURCE%/*}/checkers
+        UTILS=${BASH_SOURCE%/*}/utils
         BASE_DIR="providechecker_results/$HWNAME"
         mkdir -p "$BASE_DIR"
 
@@ -35,15 +86,7 @@ function set_variables() {
         # option in the testset, otherwise, we get the files listed on the 
         # command line from the user.
         if [[ "$1" == "-a" || "$1" == "--auto" ]]; then
-                echo "    *** running in auto mode ***"
-                echo "creating required files from testset..."
-
-                REQ_FILES=$(remove_line_continuations "$TEST_SET_PATH" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")
-                IFS=' ' read -r -a USR_FILES <<< "$REQ_FILES"
-
-                for file in "${USR_FILES[@]}"; do
-                        echo "$file"
-                done
+                auto_mode
         elif [[ "$1" == "-f" || "$1" == "--files" ]]; then
                 shift
                 USR_FILES=("$@")
@@ -51,9 +94,7 @@ function set_variables() {
                 echo "Invalid option"
                 exit
         fi
-        exit
-        # Remove line continuations and store testset
-        TEST_SET=$(remove_line_continuations "$TEST_SET_PATH")
+        
 }
 
 # Requires filepath of directory
@@ -61,14 +102,6 @@ function set_variables() {
 function copy_files() {
         mkdir -p "$1"
         cp "${USR_FILES[@]}" "$1"
-
-        # for file in "${USR_FILES[@]}"; do
-        #         if ! cp "$file" "$1"; then
-        #                 echo "Files don't exist in this directory or are spelled wrong!"
-        #                 rm -r "$1"
-        #                 exit 1
-        #         fi
-        # done
 }
 
 # Takes all arguments passed in from command line
@@ -155,12 +188,14 @@ EOF
 }
 
 function evaluate_results() {
-        for directory in "$BASE_DIR"/*/; do
-                dirname=$(basename "$directory")
-                cmdName=${dirname#*_}
-                cmd=$(realpath "$CHECKERS/$cmdName")
-                (cd "$directory" && $cmd --test)
-                assert_test "$?" "$cmdName"
+        for dir in "$BASE_DIR"/*/; do
+                if [[ "$(basename "$dir")" != "auto_created_files" ]]; then
+                        dirname=$(basename "$dir")
+                        cmdName=${dirname#*_}
+                        cmd=$(realpath "$CHECKERS/$cmdName")
+                        (cd "$dir" && $cmd --test)
+                        assert_test "$?" "$cmdName"
+                fi
         done
 }
 
