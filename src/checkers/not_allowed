@@ -14,12 +14,12 @@ function performEdits() {
 }
 
 function performTests() {
-        echo "~~~~~~~~ Not Allowed Test ~~~~~~~~~~~~"
+        echo -e "~~~~~~~~~~ ${LB}Not Allowed Test${NC} ~~~~~~~~~~~~"
         if grep -q "NOT_OK" $OUTFILE; then
-                echo "Failed to provide. Good!"
+                echo -e "${GRN}Failed to provide. Good!${NC}"
                 exit 0
         else
-                echo "Submission was accepted. Bad!"
+                echo -e "${RED}Submission was accepted. Bad!${NC}"
                 exit 1
         fi
 }

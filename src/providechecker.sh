@@ -20,10 +20,10 @@ function remove_line_continuations() {
 
 function auto_mode() {
         # Run Auto Mode to create needed files
-        echo "    *** running in auto mode ***"
-        echo "creating required files from testset in:"
+        printf "%s\n\n" "    *** running in auto mode ***"
         AUTO_DIR="$BASE_DIR/auto_created_files"
-        echo "$AUTO_DIR"
+        echo "creating required files from testset in: $AUTO_DIR"
+        echo ""
 
         # make the directory for the automagially created files
         mkdir -p "$AUTO_DIR"
@@ -33,12 +33,15 @@ function auto_mode() {
         IFS=' ' read -r -a USR_FILES <<< "$REQ_FILES"
 
         # Get the executable name, if there is one specified
-        EXEC=$(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\scompile_student\s--assert-exec=).[^\s]+")
+        CMPL_STU=($(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\scompile_student\s--assert-exec=).+"))
+
+        EXEC="${CMPL_STU[0]}"         # Executalble name
+        CMPL_CMD=("${CMPL_STU[@]:1}") # Compilation Command
+
+
         if [[ "$EXEC" == "" ]]; then
                 echo "Executable could not be parsed from $TEST_SET_PATH"
-                echo "Make sure an executable name has been specified"
-                echo "after --assert-exec="
-                exit 1
+                echo "Did you mean to assert an executable?"
         fi
 
         # Create the specified files parsed from the testset.
@@ -52,22 +55,35 @@ function auto_mode() {
                         mv "${USR_FILES[i]}" "$AUTO_DIR"
                 fi
                 USR_FILES[i]="$file" # update USR_FILE array 
-                                        # to hold full path to file
+                                     # to hold full path to file
         done
 
-        # If a Makefile was created in the above loop, we need to edit
-        # it to ensure it is a working Makefile. Again we use the 
+        # If a Makefile was created in the above loop, or, if we use "make" as
+        # our compilation command, but a Makefile is not required we need to 
+        # edit/create it to ensure it is a working Makefile. Again we use the 
         # file_maker.sh utility
-        if [[ -f "$AUTO_DIR/Makefile" ]]; then
+        if [[ -f "$AUTO_DIR/Makefile" || "${CMPL_CMD[0]}" == "make" ]]; then
                 CPP=($(find $AUTO_DIR -type f -name \*.cpp))
                 "$UTILS"/file_maker.sh make "$EXEC" "${CPP[0]##*\/}"
                 mv "Makefile" "$AUTO_DIR"
+                # Add path to Makfile if one does not exist
+                if [[ ! "${USR_FILES[*]}" == "$AUTO_DIR/Makefile" ]]; then
+                        USR_FILES+=("$AUTO_DIR/Makefile")
+                fi
+
         fi
+
 }
 
 # Sets variables we need for various purposes. Takes all arguments from
 # command line
 function set_variables() {
+        
+        # Used to display text in Color or reset to No Color
+        export RED="\033[0;31m" # Red
+        export GRN="\033[0;32m" # Green
+        export LB="\033[1;34m"  # Light Blue
+        export NC="\033[0m"     # No Color
         # Store homework name, user given files and set up file paths
         REMOTE="mkorma01@homework.cs.tufts.edu"
         HWNAME="$1"
@@ -120,16 +136,38 @@ function validate_assignment() {
 }
 
 # Takes exit status of a given test and determines success or failure
+# Opens an editor for user to examine the faulty tests provide_output.txt file
+# to help debug provide
 function assert_test() {
-        # echo "exit status: $1"
         if [[ "$1" == 1 ]]; then
-                echo "~~~~~~~ $2 test failed. ~~~~~~~"
+                if [[ "$4" != 4 ]]; then
+                        echo -e "~~~~~~~ ${RED}$2 test failed.${NC} ~~~~~~~"
+                fi
+                echo "Check provide output to see what went wrong:"
+                echo "Launching your default editor. Close file to continue..."
                 echo ""
+                sleep 3
+                if [ "$(which code 2> /dev/null)" ]; then
+                        "${EDITOR:-code}" --wait "$3"/provide_output.txt &
+                        pid="$!"
+                        wait "$pid"
+                elif [ -n "$EDITOR" ]; then
+                        "$EDITOR" "$3"/provide_output.txt
+                else
+                        "${EDITOR:-vi}" "$3"/provide_output.txt
+                fi
         else
-                echo "~~~~~~~ $2 test passed. ~~~~~~~"
-                echo ""
+                if [[ "$4" != 4 ]]; then
+                        echo -e "~~~~~~~ ${GRN}$2 test passed.${NC} ~~~~~~~"
+                        echo ""
+                fi
+                # Clean up files if test passed
+                # rm -rf "$3" > /dev/null
         fi
 }
+
+# export function to use in compile_student
+export -f assert_test
 
 function perform_edits() {
         i=1
@@ -194,7 +232,7 @@ function evaluate_results() {
                         cmdName=${dirname#*_}
                         cmd=$(realpath "$CHECKERS/$cmdName")
                         (cd "$dir" && $cmd --test)
-                        assert_test "$?" "$cmdName"
+                        assert_test "$?" "$cmdName" "$dir"
                 fi
         done
 }

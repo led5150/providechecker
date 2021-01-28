@@ -18,13 +18,13 @@ function performTests() {
         FAIL="NOT_OK"
         FAIL2="This submission doesn't count. Please try again later!"
 
-        echo "~~~~~~~~~ Require Test ~~~~~~~~~~~~"
+        echo -e "~~~~~~~~~~ ${LB}Require Test${NC} ~~~~~~~~~~~~"
         # The test
         if grep -qE "($FAIL|$FAIL2)" "$OUTFILE"; then
-                echo "Failed to provide. Good!"
+                echo -e "${GRN}Failed to provide. Good!${NC}"
                 exit 0
         else
-                echo "Succeded to provide. Bad!"
+                echo -e "${RED}Submission was provided. Bad!${NC}"
                 exit 1
         fi
 }
