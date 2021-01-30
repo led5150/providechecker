@@ -7,8 +7,10 @@ function validate_usage() {
         # Check to make sure user has run the program correctly
         if [[ "$#" -lt 2 ]]; then
                 echo "Invalid number of arguments provided"
-                echo "Usage: $0 homework_name [(-a|--auto)] [(-f|--files) file1 file2 file3 ...]"
-                exit
+                echo "Usage: $0 homework_name [--auto | --files file1 file2 file3 ...]"
+                exit 1
+        else
+                echo "  ~~~ Welcome to ProvideChecker ~~~"
         fi
 }
 
@@ -22,27 +24,30 @@ function auto_mode() {
         # Run Auto Mode to create needed files
         printf "%s\n\n" "    *** running in auto mode ***"
         AUTO_DIR="$BASE_DIR/auto_created_files"
-        echo "creating required files from testset in: $AUTO_DIR"
-        echo ""
+        echo "creating required files from testset in: "
+        printf "%s\n\n" "$AUTO_DIR"
 
         # make the directory for the automagially created files
         mkdir -p "$AUTO_DIR"
 
-        # parse required files from testset
-        REQ_FILES=$(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")
+        # Get an array of "user files" from the requried files
         IFS=' ' read -r -a USR_FILES <<< "$REQ_FILES"
 
-        # Get the executable name, if there is one specified
-        CMPL_STU=($(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\scompile_student\s--assert-exec=).+"))
-
-        EXEC="${CMPL_STU[0]}"         # Executalble name
-        CMPL_CMD=("${CMPL_STU[@]:1}") # Compilation Command
-
-
-        if [[ "$EXEC" == "" ]]; then
-                echo "Executable could not be parsed from $TEST_SET_PATH"
-                echo "Did you mean to assert an executable?"
+        if [[ "${#USR_FILES[@]}" == 0 ]]; then
+                echo -e "${YLW}No required files...Generating random file for submission${NC}"
+                USR_FILES+=(random_"$i".cpp)
         fi
+
+        # Get the full --assert-exec= command from testset
+        ASRT_EXEC=($(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\scompile_student\s--assert-exec=).+"))
+        if [[ "${#ASRT_EXEC[@]}" -lt 2 ]]; then
+                echo "'assert-exec=' option was used in $TEST_SET_PATH"
+                echo "but was not properly configured"
+                echo "Usage: compile_student [--assert-exec=EXEC_NAME] compilationCMD ..."
+                exit 1
+        fi
+        EXEC="${ASRT_EXEC[0]}"         # Executalble name
+        CMPL_CMD=("${ASRT_EXEC[@]:1}") # Compilation Command
 
         # Create the specified files parsed from the testset.
         # If the file has a ".cpp" extension, we overwrite it to make it
@@ -67,10 +72,8 @@ function auto_mode() {
                 "$UTILS"/file_maker.sh make "$EXEC" "${CPP[0]##*\/}"
                 mv "Makefile" "$AUTO_DIR"
                 # Add path to Makfile if one does not exist
-                if [[ ! "${USR_FILES[*]}" == "$AUTO_DIR/Makefile" ]]; then
-                        USR_FILES+=("$AUTO_DIR/Makefile")
-                fi
-
+                [[ ! "${USR_FILES[*]}" =~ $AUTO_DIR/Makefile ]] \
+                        && USR_FILES+=("$AUTO_DIR/Makefile")
         fi
 
 }
@@ -83,15 +86,29 @@ function set_variables() {
         export RED="\033[0;31m" # Red
         export GRN="\033[0;32m" # Green
         export LB="\033[1;34m"  # Light Blue
+        export YLW="\033[1;33m" # Yellow
         export NC="\033[0m"     # No Color
         # Store homework name, user given files and set up file paths
         REMOTE="mkorma01@homework.cs.tufts.edu"
         HWNAME="$1"
         shift
 
+        # Remove line continuations and store testset
         TEST_SET_PATH=/comp/15/grading/screening/testsets/"$HWNAME"
-        TEST_SET=$(remove_line_continuations "$TEST_SET_PATH") # Remove line continuations and store testset
+        TEST_SET=$(remove_line_continuations "$TEST_SET_PATH")
+
         ASSN_CONF=/comp/15/grading/assignments.conf
+
+        # parse required files from testset
+        REQ_FILES=$(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+" | sed 's/[ \t]*//')
+
+        if [[ "${REQ_FILES[0]}" == "" ]]; then
+                echo -e "${YLW}Warning: No Required Files were specified, but 'require'"
+                echo -e "command was used in testset. Did you mean to specify filenames?"
+                echo -e "'Require' test will NOT be run${NC}"
+                echo ""
+        fi
+
         CHECKERS=${BASH_SOURCE%/*}/checkers
         UTILS=${BASH_SOURCE%/*}/utils
         BASE_DIR="providechecker_results/$HWNAME"
@@ -106,6 +123,10 @@ function set_variables() {
         elif [[ "$1" == "-f" || "$1" == "--files" ]]; then
                 shift
                 USR_FILES=("$@")
+                if [[ "${#USR_FILES[@]}" == 0 ]]; then
+                        echo -e "${RED}Error: ${NC}No files were specified"
+                        exit 1
+                fi
         else 
                 echo "Invalid option"
                 exit
@@ -140,13 +161,13 @@ function validate_assignment() {
 # to help debug provide
 function assert_test() {
         if [[ "$1" == 1 ]]; then
-                if [[ "$4" != 4 ]]; then
+                if [[ "$4" == "print" ]]; then
                         echo -e "~~~~~~~ ${RED}$2 test failed.${NC} ~~~~~~~"
                 fi
                 echo "Check provide output to see what went wrong:"
                 echo "Launching your default editor. Close file to continue..."
                 echo ""
-                sleep 3
+                sleep 2
                 if [ "$(which code 2> /dev/null)" ]; then
                         "${EDITOR:-code}" --wait "$3"/provide_output.txt &
                         pid="$!"
@@ -157,12 +178,12 @@ function assert_test() {
                         "${EDITOR:-vi}" "$3"/provide_output.txt
                 fi
         else
-                if [[ "$4" != 4 ]]; then
+                if [[ "$4" == "print" ]]; then
                         echo -e "~~~~~~~ ${GRN}$2 test passed.${NC} ~~~~~~~"
                         echo ""
                 fi
                 # Clean up files if test passed
-                # rm -rf "$3" > /dev/null
+                rm -rf "$3" > /dev/null
         fi
 }
 
@@ -178,12 +199,16 @@ function perform_edits() {
                 if ! TEST_LINE=($(egrep '^(FAIL|WARN)' <<<"$line")); then
                         continue
                 fi
+
                 TESTSET_CMD="${TEST_LINE[1]}"
                 STAGING_DIR="$BASE_DIR/${i}_$TESTSET_CMD"
                 if ! [ -f "$CHECKERS/$TESTSET_CMD" ]; then
                         continue
                 fi
                 CHECKER=$(realpath "$CHECKERS/$TESTSET_CMD")
+                if [[ "${REQ_FILES[0]}" == "" && "${TEST_LINE[1]}" == "require" ]]; then
+                        continue
+                fi
                 copy_files "$STAGING_DIR"
                 # run test
                 (cd "$STAGING_DIR" && $CHECKER "${TEST_LINE[@]:2}")
@@ -232,7 +257,7 @@ function evaluate_results() {
                         cmdName=${dirname#*_}
                         cmd=$(realpath "$CHECKERS/$cmdName")
                         (cd "$dir" && $cmd --test)
-                        assert_test "$?" "$cmdName" "$dir"
+                        assert_test "$?" "$cmdName" "$dir" "print"
                 fi
         done
 }
