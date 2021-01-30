@@ -4,7 +4,6 @@ rm -r providechecker_results
 
 # Validates user has properly run program
 function validate_usage() {
-        # Check to make sure user has run the program correctly
         if [[ "$#" -lt 2 ]]; then
                 echo "Invalid number of arguments provided"
                 echo "Usage: $0 homework_name [--auto | --files file1 file2 file3 ...]"
@@ -30,8 +29,11 @@ function auto_mode() {
         # make the directory for the automagially created files
         mkdir -p "$AUTO_DIR"
 
-        # Get an array of "user files" from the requried files
-        IFS=' ' read -r -a USR_FILES <<< "$REQ_FILES"
+        # The USR_FILES array needs to have the names of required files in order
+        # for the files to be able to be created properly. We simply copy the 
+        # array starting at the 3rd element
+        IFS=' ' read -r -a USR_FILES <<< "${REQ_FILES[@]:2}"
+
 
         if [[ "${#USR_FILES[@]}" == 0 ]]; then
                 echo -e "${YLW}No required files...Generating random file for submission${NC}"
@@ -64,9 +66,8 @@ function auto_mode() {
         done
 
         # If a Makefile was created in the above loop, or, if we use "make" as
-        # our compilation command, but a Makefile is not required we need to 
-        # edit/create it to ensure it is a working Makefile. Again we use the 
-        # file_maker.sh utility
+        # our compilation command, we edit/create it to ensure it is a 
+        # working Makefile using the file_maker.sh utility
         if [[ -f "$AUTO_DIR/Makefile" || "${CMPL_CMD[0]}" == "make" ]]; then
                 CPP=($(find $AUTO_DIR -type f -name \*.cpp))
                 "$UTILS"/file_maker.sh make "$EXEC" "${CPP[0]##*\/}"
@@ -79,7 +80,8 @@ function auto_mode() {
 }
 
 # Sets variables we need for various purposes. Takes all arguments from
-# command line
+# command line.
+# Store homework name, user given files and set up file paths
 function set_variables() {
         
         # Used to display text in Color or reset to No Color
@@ -88,7 +90,7 @@ function set_variables() {
         export LB="\033[1;34m"  # Light Blue
         export YLW="\033[1;33m" # Yellow
         export NC="\033[0m"     # No Color
-        # Store homework name, user given files and set up file paths
+
         REMOTE="mkorma01@homework.cs.tufts.edu"
         HWNAME="$1"
         shift
@@ -97,21 +99,29 @@ function set_variables() {
         TEST_SET_PATH=/comp/15/grading/screening/testsets/"$HWNAME"
         TEST_SET=$(remove_line_continuations "$TEST_SET_PATH")
 
+        # Store path to assignments.conf
         ASSN_CONF=/comp/15/grading/assignments.conf
 
         # parse required files from testset
-        REQ_FILES=$(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+" | sed 's/[ \t]*//')
+        mapfile -t REQ_FILES < <(echo "${TEST_SET[@]}" | grep -oP "^(FAIL|WARN)\srequire\s.+")
+        IFS=$'\t ' read -r -a REQ_FILES <<< "${REQ_FILES[*]}"
 
-        if [[ "${REQ_FILES[0]}" == "" ]]; then
+        RUN_REQ=1       # Flag to determine if we run 'require' test. 
+                        # 1 = run, 0 = don't run
+
+        # If require is used, but no files are specified we print this warning.
+        # Require test is not run.
+        if [[ "${#REQ_FILES[@]:2}" == 2 && "${REQ_FILES[1]}" == "require" ]]; then
                 echo -e "${YLW}Warning: No Required Files were specified, but 'require'"
                 echo -e "command was used in testset. Did you mean to specify filenames?"
                 echo -e "'Require' test will NOT be run${NC}"
                 echo ""
+                RUN_REQ=0
         fi
 
-        CHECKERS=${BASH_SOURCE%/*}/checkers
-        UTILS=${BASH_SOURCE%/*}/utils
-        BASE_DIR="providechecker_results/$HWNAME"
+        CHECKERS=${BASH_SOURCE%/*}/checkers          # Path to checkers
+        UTILS=${BASH_SOURCE%/*}/utils                # Path to utilities
+        BASE_DIR="providechecker_results/$HWNAME"    # Base directory for bulding submissions
         mkdir -p "$BASE_DIR"
 
         # Here we will evaluate if running in auto or user provided mode:
@@ -131,7 +141,6 @@ function set_variables() {
                 echo "Invalid option"
                 exit
         fi
-        
 }
 
 # Requires filepath of directory
@@ -206,7 +215,7 @@ function perform_edits() {
                         continue
                 fi
                 CHECKER=$(realpath "$CHECKERS/$TESTSET_CMD")
-                if [[ "${REQ_FILES[0]}" == "" && "${TEST_LINE[1]}" == "require" ]]; then
+                if [[ "$RUN_REQ" == 0 && "${TEST_LINE[1]}" == "require" ]]; then
                         continue
                 fi
                 copy_files "$STAGING_DIR"
@@ -227,23 +236,23 @@ function remote_provide() {
         # cd into it, find all files in directory and provide
         # TODO : Shorten this
         ssh -T "$REMOTE" bash -s <<EOF
-                function provideAll() {
-                        local files=\$(find . -maxdepth 1 -type f \
-                                      | xargs -r  basename -a)
-                        
-                        if ! [ -z "\$files" ]; then 
-                                yes | provide comp15 $HWNAME \$files > provide_output.txt
+        function provideAll() {
+                local files=\$(find . -maxdepth 1 -type f \
+                                | xargs -r  basename -a)
+                
+                if ! [ -z "\$files" ]; then 
+                        yes | provide comp15 $HWNAME \$files > provide_output.txt
+                fi
+
+                for dir in */; do
+                        if ! [ -d "\$dir" ]; then
+                                continue
                         fi
+                        (cd \$dir && provideAll)
+                done
+        }
 
-                        for dir in */; do
-                                if ! [ -d "\$dir" ]; then
-                                        continue
-                                fi
-                                (cd \$dir && provideAll)
-                        done
-                }
-
-                cd ~/$BASE_DIR && provideAll
+        cd ~/$BASE_DIR && provideAll
 
 EOF
         # Copy provide_output.txt's back to local

@@ -128,7 +128,7 @@ cat >> "$MAKEFILE" << EOF
 #
 
 
-CXX      = clang++
+CXX      = g++
 CXXFLAGS = -g3 -Wall -Wextra
 
 
