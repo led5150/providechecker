@@ -8,13 +8,13 @@ OUTFILE=provide_output.txt
 function performTests() {
         FAIL="This submission doesn't count"
 
-        echo "~~~~~~~~~   Passing Test ~~~~~~~~~~~~"
+        echo -e "~~~~~~~~~~~ ${LB}Passing Test${NC} ~~~~~~~~~~~"
         # The test
         if grep -qE "($FAIL|Notify your instructor)" "$OUTFILE"; then
-                echo "Submission failed to provide. Bad!"
+                echo -e "${RED}Submission failed to provide. Bad!${NC}"
                 exit 1
         else
-                echo "Submission was accepted. Good!"
+                echo -e "${GRN}Submission was accepted. Good!${NC}"
                 exit 0
         fi
 }

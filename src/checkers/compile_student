@@ -8,6 +8,8 @@ fi
 COMPILE_CMND=("${@:1}")
 OUTFILE=provide_output.txt
 
+
+
 function warnEdits() {
 
         WARN_CONDITION="static bool wrn5611d9f99bc990c23027ca70b7aba2(int wrne9cc6) {}"
@@ -20,10 +22,10 @@ function warnEdits() {
 
 function warnTests() {
         if grep -q "warning:" "$OUTFILE"; then
-                echo "Submission produced a warning. Good!"
+                echo -e "${GRN}Submission produced a warning. Good!${NC}"
                 exit 0
         else
-                echo "Submission did not produce a warning. Bad!"
+                echo -e "${RED}Submission did not produce a warning. Bad!${NC}"
                 exit 1
         fi
 }
@@ -38,10 +40,10 @@ function errorEdits() {
 
 function errorTests() {
         if grep -q 'No errors, Good Job!' "$OUTFILE"; then
-                echo "Submission did not produce an error. Bad!"
+                echo -e "${RED}Submission did not produce an error. Bad!${NC}"
                 exit 1
         else
-                echo "Submission produced an error. Good!"
+                echo -e "${GRN}Submission produced an error. Good!${NC}"
                 exit 0
         fi
 }
@@ -57,42 +59,55 @@ function stopEdits() {
 }
 
 function stopTests() {
+        
+        
         if egrep -q -i "(stop|stop.)" "$OUTFILE"; then
-                echo "Submission produced a stopping condition. Good!"
+                echo -e "${GRN}Submission produced a stopping condition. Good!${NC}"
                 exit 0
         else
-                echo "Submission did not produce a stopping condition. Bad!"
+                echo -e "${RED}Submission did not produce a stopping condition. Bad!${NC}"
                 exit 1
         fi
+        
 }
 
 function badEdits() {
-        # TODO This doesn't work if there's no makefile
-        #      Not sure how to fix
         sed -i -e "s/$EXECUTABLE/bad_exec/" Makefile
 }
 
 function badTests() {
         IMPROPERLY_NAMED="Your program built but was improperly named"
+
         if grep -q "$IMPROPERLY_NAMED" "$OUTFILE"; then
-                echo "Submission produced a bad executable name. Good!"
+                echo -e "${GRN}Submission produced a bad executable name. Good!${NC}"
                 exit 0
         else
-                echo "Submission did not produce a bad executable name. Bad!"
+                echo -e "${RED}Submission did not produce a bad executable name. Bad!${NC}"
                 exit 1
         fi
+
 }
 
 function performEdits() {
         toRun=("warn" "error")
 
-        # Stop condition test only applies if we have a makefile
-        [[ "${COMPILE_CMND[0]}" == "make" ]] && toRun+=("stop")
-
-        # Bad executable test only applies if we assert an executable name
-        # https://stackoverflow.com/questions/3601515/13864829#13864829
-        [[ -z ${EXECUTABLE+x} ]] && toRun+=("bad")
-
+        # Stop condition only applies if we have a makefile
+        # Bad executable only applies if compilation command is exactly "make"
+        # with no target specified
+        if [[ "${COMPILE_CMND[0]}" == "make" ]]; then
+                toRun+=("stop") 
+                if [[ "${#COMPILE_CMND[@]}" -lt 2 ]]; then
+                        toRun+=("bad")
+                else 
+                        echo -e "${YLW}A make target was specified, "
+                        echo -e "or a custom compilation command was used."
+                        echo -e "Unable to perform 'bad' test.${NC}"
+                        echo ""
+                fi
+        fi
+        
+        
+           
         for test in "${toRun[@]}"; do
                 mkdir "$test"
                 # idk why I can't use "-exec ... +" here
@@ -103,10 +118,10 @@ function performEdits() {
 }
 
 function performTests() {
-        echo "~~~~~~~~ Compile Student Test ~~~~~~~~~~~~"
-
+        echo -e "~~~~~~~~~~ ${LB}Compile Student Test${NC} ~~~~~~~~~~~~"
         for directory in */; do
                 (cd "$directory" && "$(basename "$directory")"Tests)
+                assert_test "$?" "${directory%/*}" "${directory%/*}"
         done
 }
 
