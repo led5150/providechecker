@@ -38,12 +38,13 @@ function auto_mode() {
     fi
 
     # Get the full --assert-exec= command from testset
-    ASRT_EXEC=($(echo "${TEST_SET[@]}" | grep -oP "(?<=(FAIL|WARN)\scompile_student\s--assert-exec=).+"))
-    if [[ "${#ASRT_EXEC[@]}" -lt 2 ]]; then
-            error "'assert-exec=' option was used in:" \
-                    "${NC}$TEST_SET_PATH\n" \
-                    "${RED}but was not properly configured" \
-                    "${NC}Usage: compile_student [--assert-exec=EXEC_NAME] compilationCMD ..."
+    read -ra ASRT_EXEC < <(echo  "$TEST_SET" | grep -v "#" | grep -oP "(?<=--assert-exec=).+$")
+
+    # quick sanity check for --assert-exec option
+    if [[ "${ASRT_EXEC[0]}" != "" && "${#ASRT_EXEC[@]}" -lt 2 ]]; then
+            error "'--assert-exec=' option was used but was not properly configured\n" \
+                  "${NC}Please edit: $TEST_SET_PATH" \
+                  "${NC}Usage: compile_student [--assert-exec=EXEC_NAME] compilationCMD ..."
     fi
     EXEC="${ASRT_EXEC[0]}"         # Executalble name
     CMPL_CMD=("${ASRT_EXEC[@]:1}") # Compilation Command
@@ -212,8 +213,8 @@ function set_variables() {
     TEST_SET=$(remove_line_continuations "$TEST_SET_PATH")
     
     # parse required files from testset
-	# read -ra REQ_FILES < <(echo "$TEST_SET" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")	# regex pattern only matched with exactly 1 whitespce char in between 
-	read -ra REQ_FILES < <(echo  "$TEST_SET" | grep -v "#" | grep -w "require")
+    # read -ra REQ_FILES < <(echo "$TEST_SET" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")	# regex pattern only matched with exactly 1 whitespce char in between 
+    read -ra REQ_FILES < <(echo  "$TEST_SET" | grep -v "#" | grep -w "require")
     NUM_REQ=${#REQ_FILES[@]}
     # If require is used, but no files are specified we print this warning.
     # Require test is not run.
