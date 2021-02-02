@@ -59,7 +59,7 @@ function auto_mode() {
                     mv "${USR_FILES[i]}" "$AUTO_DIR"
             fi
             USR_FILES[i]="$file" # update USR_FILE array 
-                                    # to hold full path to file
+                                 # to hold full path to file
     done
 
     # If a Makefile was created in the above loop, or, if we use "make" as
@@ -212,7 +212,8 @@ function set_variables() {
     TEST_SET=$(remove_line_continuations "$TEST_SET_PATH")
     
     # parse required files from testset
-    read -ra REQ_FILES < <(echo "$TEST_SET" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")
+	# read -ra REQ_FILES < <(echo "$TEST_SET" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")	# regex pattern only matched with exactly 1 whitespce char in between 
+	read -ra REQ_FILES < <(echo  "$TEST_SET" | grep -v "#" | grep -w "require")
     NUM_REQ=${#REQ_FILES[@]}
     # If require is used, but no files are specified we print this warning.
     # Require test is not run.
