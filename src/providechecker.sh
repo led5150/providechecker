@@ -32,7 +32,7 @@ function auto_mode() {
     read -r -a USR_FILES <<< "${REQ_FILES[@]}"
 
 
-    if [[ "${#USR_FILES[@]}" == 0 ]]; then
+    if [[ "$NUM_REQ" == 0 ]]; then
             echo -e "${YLW}No required files...Generating random file for submission${NC}"
             USR_FILES+=(random_"$i".cpp)
     fi
@@ -215,16 +215,18 @@ function set_variables() {
     # parse required files from testset
     # read -ra REQ_FILES < <(echo "$TEST_SET" | grep -oP "(?<=(FAIL|WARN)\srequire\s).+")	# regex pattern only matched with exactly 1 whitespce char in between 
     read -ra REQ_FILES < <(echo  "$TEST_SET" | grep -v "#" | grep -w "require")
+    REQ_FILES=("${REQ_FILES[@]:2}")
     NUM_REQ=${#REQ_FILES[@]}
-    # If require is used, but no files are specified we print this warning.
-    # Require test is not run.
+
+    # If require is not used, require is not run.
     if [[ "$NUM_REQ" -gt 0 ]]; then
             RUN_REQ=1       # Flag to determine if we run 'require' test. 
                             # 1 == run, 0 == don't run
     else
-            warning "No Required Files were specified, but 'require'" \
-                    "command was used in testset. Did you mean to specify filenames?" \
-                    "'Require' test will NOT be run"
+        #TODO: Find a place to make this work?
+        #     warning "No Required Files were specified, but 'require'" \
+        #             "command was used in testset. Did you mean to specify filenames?" \
+        #             "'Require' test will NOT be run"
             RUN_REQ=0
     fi
 
@@ -294,14 +296,13 @@ function assert_test() {
             echo -e "Launching your default editor. Close file to continue...${NC}"
             echo ""
             sleep 2
-            if [ "$(which code 2> /dev/null)" ]; then
-                    "${EDITOR:-code}" --wait "$3"/provide_output.txt &
-                    pid="$!"
-                    wait "$pid"
-            elif [ -n "$EDITOR" ]; then
+            
+            if [ -n "$EDITOR" ]; then
                     "$EDITOR" "$3"/provide_output.txt
+            elif [ "$(which code 2> /dev/null)" ]; then
+                    code --wait "$3"/provide_output.txt
             else
-                    "${EDITOR:-vi}" "$3"/provide_output.txt
+                    vim "$3"/provide_output.txt
             fi
     else
             if [[ "$4" == "print" ]]; then
