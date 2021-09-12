@@ -56,8 +56,9 @@ function auto_mode() {
             file="$AUTO_DIR/${USR_FILES[i]}"
             touch "$file"
             if [[ "${USR_FILES[i]}" =~ .*".cpp" ]]; then
+                    cd "$AUTO_DIR"
                     "$UTILS"/file_maker.sh cpp "${USR_FILES[i]}"
-                    mv "${USR_FILES[i]}" "$AUTO_DIR"
+                    cd -
             fi
             USR_FILES[i]="$file" # update USR_FILE array 
                                  # to hold full path to file
@@ -68,8 +69,9 @@ function auto_mode() {
     # working Makefile using the file_maker.sh utility
     if [[ -f "$AUTO_DIR/Makefile" || "${CMPL_CMD[0]}" == "make" ]]; then
             CPP=($(find $AUTO_DIR -type f -name \*.cpp))
+            cd "$AUTO_DIR"
             "$UTILS"/file_maker.sh make "$EXEC" "${CPP[0]##*\/}"
-            mv "Makefile" "$AUTO_DIR"
+            cd -
             # Add path to Makfile if one does not exist
             [[ ! "${USR_FILES[*]}" =~ $AUTO_DIR/Makefile ]] \
                     && USR_FILES+=("$AUTO_DIR/Makefile")
@@ -332,8 +334,9 @@ function perform_edits() {
             # 1. Skips making files for tests not specified in testset
             # 2. Skips running the 'require' test if no required files were 
             #    specified
-            # 3. Skips 'not_allowed' test if we don't have room to make a not 
-            #    allowed file
+            # 3. Skips 'not_allowed' test if number of required files is 
+            #    greater than or equal to the number of files allowed by the 
+            #    assignment's config
             if ! [ -f "$CHECKERS/$TESTSET_CMD" ]; then
                     continue
             fi
