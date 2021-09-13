@@ -1,6 +1,7 @@
 #!/bin/bash
 
-rm -rf providechecker_results
+# Remove working directory upfront - FOR DEBUGGING ONLY
+# rm -rf providechecker_results
 
 # Validates user has properly run program
 function validate_usage() {
@@ -58,7 +59,7 @@ function auto_mode() {
             if [[ "${USR_FILES[i]}" =~ .*".cpp" ]]; then
                     cd "$AUTO_DIR"
                     "$UTILS"/file_maker.sh cpp "${USR_FILES[i]}"
-                    cd -
+                    cd - > /dev/null
             fi
             USR_FILES[i]="$file" # update USR_FILE array 
                                  # to hold full path to file
@@ -71,7 +72,7 @@ function auto_mode() {
             CPP=($(find $AUTO_DIR -type f -name \*.cpp))
             cd "$AUTO_DIR"
             "$UTILS"/file_maker.sh make "$EXEC" "${CPP[0]##*\/}"
-            cd -
+            cd - > /dev/null
             # Add path to Makfile if one does not exist
             [[ ! "${USR_FILES[*]}" =~ $AUTO_DIR/Makefile ]] \
                     && USR_FILES+=("$AUTO_DIR/Makefile")
