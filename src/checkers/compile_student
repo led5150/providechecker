@@ -96,17 +96,16 @@ function performEdits() {
         # with no target specified
         if [[ "${COMPILE_CMND[0]}" == "make" ]]; then
                 toRun+=("stop") 
-                if [[ "${#COMPILE_CMND[@]}" -lt 2 ]]; then
+                if [[ "${#COMPILE_CMND[@]}" -lt 2 && "$EXECUTABLE" != "" ]]; then
                         toRun+=("bad")
                 else 
                         echo -e "${YLW}A make target was specified, "
-                        echo -e "or a custom compilation command was used."
-                        echo -e "Unable to perform 'bad' test.${NC}"
+                        echo -e "a custom compilation command was used."
+                        echo -e "or '--assert-exec' was not used in testset."
+                        echo -e "Unable to perform 'bad_executable' test.${NC}"
                         echo ""
                 fi
         fi
-        
-        
            
         for test in "${toRun[@]}"; do
                 mkdir "$test"

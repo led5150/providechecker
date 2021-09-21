@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Remove working directory upfront - FOR DEBUGGING ONLY
-# rm -rf providechecker_results
+rm -rf providechecker_results
 
 # Validates user has properly run program
 function validate_usage() {
@@ -41,15 +41,20 @@ function auto_mode() {
     # Get the full --assert-exec= command from testset
     read -ra ASRT_EXEC < <(echo  "$TEST_SET" | grep -v "#" | grep -oP "(?<=--assert-exec=).+$")
 
+    
+
     # quick sanity check for --assert-exec option
     if [[ "${ASRT_EXEC[0]}" != "" && "${#ASRT_EXEC[@]}" -lt 2 ]]; then
             error "'--assert-exec=' option was used but was not properly configured\n" \
                   "${NC}Please edit: $TEST_SET_PATH" \
                   "${NC}Usage: compile_student [--assert-exec=EXEC_NAME] compilationCMD ..."
     fi
-    EXEC="${ASRT_EXEC[0]}"         # Executalble name
-    CMPL_CMD=("${ASRT_EXEC[@]:1}") # Compilation Command
 
+    if [[ "${ASRT_EXEC[0]}" != "" ]]; then
+        EXEC="${ASRT_EXEC[0]}"         # Executalble name
+        CMPL_CMD=("${ASRT_EXEC[@]:1}") # Compilation Command
+    fi
+    
     # Create the specified files parsed from the testset.
     # If the file has a ".cpp" extension, we overwrite it to make it
     # a working file using the file_maker.sh utility.
@@ -71,13 +76,16 @@ function auto_mode() {
     if [[ -f "$AUTO_DIR/Makefile" || "${CMPL_CMD[0]}" == "make" ]]; then
             CPP=($(find $AUTO_DIR -type f -name \*.cpp))
             cd "$AUTO_DIR"
+            if [[ "$EXEC" == "" ]]; then # No executable name was found in
+                                         # testset
+                EXEC="executable_name_inserted"
+            fi
             "$UTILS"/file_maker.sh make "$EXEC" "${CPP[0]##*\/}"
             cd - > /dev/null
             # Add path to Makfile if one does not exist
             [[ ! "${USR_FILES[*]}" =~ $AUTO_DIR/Makefile ]] \
                     && USR_FILES+=("$AUTO_DIR/Makefile")
     fi
-
 }
 
 function warning() {
